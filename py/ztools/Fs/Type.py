@@ -1,6 +1,8 @@
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 class Content(IntEnum):
+	# Legacy callers compare str(contentType) with names such as Content.META.
+	__str__ = Enum.__str__
 	PROGRAM = 0x0
 	META = 0x1
 	CONTROL = 0x2

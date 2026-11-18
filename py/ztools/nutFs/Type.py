@@ -1,6 +1,8 @@
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 class Content(IntEnum):
+	# Keep the same spelling as the companion Fs enum on Python 3.11+.
+	__str__ = Enum.__str__
 	PROGRAM = 0x0
 	META = 0x1
 	CONTROL = 0x2
