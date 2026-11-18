@@ -10,6 +10,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from studio.core import build_arguments, load_catalog
 from studio.runner import engine_environment, execute
+from studio.update import replace_update
 from studio.workflows import WORKFLOWS, build_jobs
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +32,9 @@ class Studio:
         self.filter = tk.StringVar()
         self.status = tk.StringVar(value='Prêt')
         self.keys_label = tk.StringVar(value='Aucun fichier externe sélectionné')
+        self.update_base = tk.StringVar()
+        self.update_patch = tk.StringVar()
+        self.update_output = tk.StringVar()
         root.title('NSCB Studio')
         root.geometry('1120x800')
         root.minsize(980, 700)
@@ -63,12 +67,15 @@ class Studio:
         self.tabs = ttk.Notebook(shell)
         self.tabs.pack(fill='both', expand=True)
         guide = ttk.Frame(self.tabs, padding=(13, 10))
+        update_tab = ttk.Frame(self.tabs, padding=(17, 13))
         expert = ttk.Frame(self.tabs, padding=(13, 10))
         compat = ttk.Frame(self.tabs, padding=(17, 13))
         self.tabs.add(guide, text='Opérations')
+        self.tabs.add(update_tab, text='Remplacer une mise à jour')
         self.tabs.add(expert, text='Catalogue Squirrel')
         self.tabs.add(compat, text='Réglages & modes classiques')
         self.setup_guide(guide)
+        self.setup_update(update_tab)
         self.setup_expert(expert)
         self.setup_compat(compat)
 
@@ -156,6 +163,52 @@ class Studio:
         self.run_row.pack(fill='x', pady=(4, 0))
         self.run_button = ttk.Button(self.run_row, text='Lancer l’opération', style='Accent.TButton', command=self.run_guided)
         self.run_button.pack(side='right')
+
+    def setup_update(self, tab):
+        ttk.Label(tab, text='Remplacer la mise à jour d’un XCI', style='Heading.TLabel').pack(anchor='w')
+        ttk.Label(tab, text='Crée un nouveau XCI. Studio vérifie le jeu, la nouvelle version et les DLC avant d’enregistrer le résultat.',
+                  style='Muted.TLabel', wraplength=780).pack(anchor='w', pady=(0, 10))
+        for label, var, extension in [('01   XCI d’origine', self.update_base, '.xci'),
+                                      ('02   Nouveau patch NSP', self.update_patch, '.nsp'),
+                                      ('03   Nouveau fichier XCI', self.update_output, None)]:
+            row = ttk.Frame(tab)
+            row.pack(fill='x', pady=5)
+            ttk.Label(row, text=label, style='Brand.TLabel', width=25).pack(side='left')
+            ttk.Entry(row, textvariable=var).pack(side='left', fill='x', expand=True, padx=8)
+            ttk.Button(row, text='Parcourir…', command=lambda v=var, e=extension: self.browse_update(v, e)).pack(side='left')
+        row = ttk.Frame(tab)
+        row.pack(fill='x', pady=10)
+        ttk.Label(row, text='Les originaux ne sont pas modifiés. Un fichier de clés compatible est requis.',
+                  style='Muted.TLabel', wraplength=620).pack(side='left')
+        self.update_run = ttk.Button(row, text='Reconstruire le XCI', style='Accent.TButton', command=self.run_update)
+        self.update_run.pack(side='right')
+
+    def browse_update(self, variable, extension):
+        if extension:
+            selected = filedialog.askopenfilename(parent=self.root, filetypes=[(extension.upper()[1:], '*' + extension)])
+            if selected and variable is self.update_base and not self.update_output.get():
+                base = Path(selected)
+                self.update_output.set(str(base.with_name(base.stem + ' [mise à jour].xci')))
+        else:
+            current = Path(self.update_output.get())
+            selected = filedialog.asksaveasfilename(parent=self.root, defaultextension='.xci',
+                                                    initialdir=str(current.parent.absolute()), initialfile=current.name,
+                                                    filetypes=[('XCI', '*.xci')])
+        if selected:
+            variable.set(selected)
+
+    def run_update(self):
+        paths = [var.get().strip() for var in (self.update_base, self.update_patch, self.update_output)]
+        if not all(paths):
+            return self.alert('Sélectionne les deux sources et le fichier de destination.')
+        base, update, destination = map(Path, paths)
+
+        def job(binary, env, stop, emit):
+            if replace_update(base, update, destination, ENGINE, binary, env, stop, emit):
+                return 'Nouveau XCI vérifié et enregistré.'
+            return 'Arrêté — aucun nouveau XCI publié.'
+
+        self.start('Remplacement de la mise à jour', operation=job)
 
     def setup_expert(self, tab):
         left = ttk.Frame(tab, width=300)
@@ -383,7 +436,7 @@ class Studio:
         except OSError as exc:
             self.alert(str(exc))
 
-    def start(self, name, jobs):
+    def start(self, name, jobs=None, *, operation=None):
         if self.stop is not None:
             return
         if self.keys is not None and not self.keys.is_file():
@@ -392,6 +445,7 @@ class Studio:
         self.cancel_button.configure(state='normal')
         self.run_button.configure(state='disabled')
         self.expert_run.configure(state='disabled')
+        self.update_run.configure(state='disabled')
         self.status.set('En cours : ' + name)
         self.progress.start(12)
         self.append_log('\n' + name + '\n')
@@ -405,12 +459,15 @@ class Studio:
                 console = binary.with_name('python.exe')
                 if binary.name.lower() == 'pythonw.exe' and console.is_file():
                     binary = console
-                code = execute([str(binary), '-u', str(ENGINE)], jobs, ENGINE.parent, env, stop, emit)
-                result = ('Arrêt demandé — vérifie les fichiers partiels.' if code is None else
-                          'Moteur terminé — consulte le journal.' if code == 0 else f'Erreur moteur (code {code})')
+                if operation is not None:
+                    result = operation(str(binary), env, stop, emit)
+                else:
+                    code = execute([str(binary), '-u', str(ENGINE)], jobs, ENGINE.parent, env, stop, emit)
+                    result = ('Arrêt demandé — vérifie les fichiers partiels.' if code is None else
+                              'Moteur terminé — consulte le journal.' if code == 0 else f'Erreur moteur (code {code})')
             except (OSError, ValueError) as exc:
-                emit(f'Impossible de lancer Squirrel : {exc}\n')
-                result = 'Échec du lancement'
+                emit(f'{exc}\n')
+                result = 'Échec de l’opération — consulte le journal.'
             self.events.put(('done', result))
         Thread(target=worker, daemon=True).start()
 
@@ -436,6 +493,7 @@ class Studio:
                 self.status.set(value)
                 self.run_button.configure(state='normal')
                 self.expert_run.configure(state='normal')
+                self.update_run.configure(state='normal')
                 self.cancel_button.configure(state='disabled')
         if lines:
             self.append_log(''.join(lines))
