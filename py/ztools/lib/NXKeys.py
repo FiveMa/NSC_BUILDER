@@ -1,4 +1,4 @@
-import os.path as path
+import os
 import re
 from binascii import hexlify as hx, unhexlify as uhx
 from pathlib import Path
@@ -11,20 +11,19 @@ class Keys(dict):
 		is_key  = re.compile(r'''\s*([a-zA-Z0-9_]*)\s* # name
 								=
 								\s*([a-fA-F0-9]*)\s* # key''', re.X)
+		external = os.environ.get('NSCB_STUDIO_KEYS_FILE') if keys_type == 'keys.txt' else None
+		candidates = (Path(external),) if external else (my_file2, my_file, Path(__file__).with_name(keys_type))
+		source = next((file for file in candidates if file.is_file()), None)
+		if source is None:
+			raise FileNotFoundError('NSCB : fichier de cles introuvable. Selectionnez-le dans les reglages de Studio.')
 		try:
-			if my_file.is_file():
-				f = open('keys.txt', 'r')
-			if my_file2.is_file():
-				f = open('ztools\\keys.txt', 'r')
-		except FileNotFoundError:
-			try:
-				f = open(path.join(path.dirname(path.abspath(__file__)), '%s' % self.keys_type), 'r')
-			except FileNotFoundError:
-				raise FileNotFoundError('Need key file %s.keys in either %s or %s' % (self.keys_type, 
-					path.expanduser('~/.switch'), path.dirname(path.abspath(__file__))))
-		iterator = (re.search(is_key, l) for l in f)
-		super(Keys, self).__init__({r[1]: uhx(r[2]) for r in iterator if r is not None})
-		f.close()
+			with source.open(encoding='utf-8-sig') as f:
+				iterator = (is_key.search(line) for line in f)
+				super(Keys, self).__init__({r[1]: uhx(r[2]) for r in iterator if r is not None})
+		except (OSError, ValueError):
+			if not external:
+				raise
+			raise RuntimeError('NSCB : fichier de cles illisible ou mal forme.') from None
 
 	def __getitem__(self, item):
 		try:

@@ -5,6 +5,10 @@
 
 **Update:** Leaving it open for commits.
 
+## NSCB Studio (Windows)
+
+This fork includes a desktop interface for Squirrel with guided operations, an argument catalog and access to the original launchers. See [installation and usage (French)](studio/README.md).
+
 ## 1. Description
 
 **Nintendo Switch Cleaner and Builder**: A multi-purpose tool for interacting with Switch game files - a "Switch-Army Knife". Written in Python, Batch, and HTML. Originally developed to remove titlerights and create multicontent NSP/XCI files, though over time has expanded to have significantly more features, specializing in batch processing and file information.

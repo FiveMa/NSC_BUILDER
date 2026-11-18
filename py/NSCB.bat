@@ -119,6 +119,8 @@ if not exist "%listmanager%" ( goto missing_things )
 if not exist "%batconfig%" ( goto missing_things )
 if not exist "%infobat%" ( goto missing_things )
 ::Important files check
+if defined NSCB_STUDIO_KEYS_FILE set "dec_keys=%NSCB_STUDIO_KEYS_FILE%"
+if defined NSCB_STUDIO_PYTHON set pycommand="%NSCB_STUDIO_PYTHON%"
 if not exist "%dec_keys%" ( goto missing_things )
 ::-----------------------------------------------------
 if exist "%w_folder%" rmdir /s /q "%w_folder%" >NUL 2>&1

@@ -40,6 +40,9 @@ if exist "%~dp0%squirrel%" set "squirrel=%~dp0%squirrel%"
 if exist "%~dp0%dec_keys%"  set "dec_keys=%~dp0%dec_keys%"
 ::Folder output
 CD /d "%~dp0"
+if defined NSCB_STUDIO_KEYS_FILE set "dec_keys=%NSCB_STUDIO_KEYS_FILE%"
+if defined NSCB_STUDIO_PYTHON set pycommand="%NSCB_STUDIO_PYTHON%"
+if defined NSCB_STUDIO_PYTHONW set pycommandw="" "%NSCB_STUDIO_PYTHONW%"
 if not exist "%dec_keys%" ( goto missing_things )
 
 if "%start_minimized%" EQU "yes" ( goto minimize )

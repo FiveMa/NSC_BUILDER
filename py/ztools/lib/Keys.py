@@ -1,3 +1,4 @@
+import os
 import re
 import aes128
 from binascii import hexlify as hx, unhexlify as uhx
@@ -141,14 +142,20 @@ else:
 	raw_keys_file2 = Path('ztools\\dev_keys.txt')
 	raw_keys_file3 = Path('ztools/keys.txt')	
 	
-if raw_keys_file.is_file():
+studio_keys = os.environ.get('NSCB_STUDIO_KEYS_FILE') if sq_settings.key_system == 'production' else None
+if studio_keys:
+	try:
+		load(Path(studio_keys))
+	except (OSError, ValueError, KeyError, TypeError):
+		raise RuntimeError('Le fichier de cles selectionne dans NSCB Studio est incomplet ou illisible.') from None
+elif raw_keys_file.is_file():
 	load(raw_keys_file)
 elif raw_keys_file2.is_file():
 	load(raw_keys_file2)
 elif raw_keys_file3.is_file():
 	load(raw_keys_file3)	
 	
-if not raw_keys_file.is_file() and not raw_keys_file2.is_file() and not raw_keys_file3.is_file():
+if not studio_keys and not raw_keys_file.is_file() and not raw_keys_file2.is_file() and not raw_keys_file3.is_file():
 	print('keys.txt missing')
 		
 #for k in titleKeks:
